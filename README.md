@@ -1,82 +1,90 @@
-# CSeametry RAG Engine
+# RAG Assistant — Groq + HuggingFace Embeddings
 
-The **CSeametry RAG Engine** is a high-performance AI system that transforms static PDF documents into dynamic, searchable knowledge bases.
-
-Unlike basic RAG pipelines, this engine uses a **decoupled architecture**, separating document ingestion from the chat interface—resulting in faster performance, better scalability, and cleaner deployments.
-
-By combining **Groq’s ultra-fast inference** with **local embeddings**, the system delivers near-instant responses with:
-- Zero cloud embedding cost  
-- 100% data privacy  
-- Source-grounded answers with citations  
+A **Retrieval-Augmented Generation (RAG)** chatbot that turns any PDF into an interactive knowledge base.  
+Built with **Groq ultra-fast inference**, **local HuggingFace embeddings**, and **FAISS vector search**.
 
 ---
 
-## Key Features
+## Features
 
-- Lightning-fast responses using Groq LPU inference  
-- Fully local embedding pipeline (no external embedding API calls)  
-- FAISS-powered semantic search  
-- Source citations with page numbers and snippets  
-- Modular architecture for scalability  
-- Cost-efficient and privacy-first design  
+- Ask questions in plain English — get accurate, sourced answers from your PDFs
+- Fully **local embeddings** — no external embedding API calls or costs
+- **FAISS** semantic search for fast, relevant retrieval
+- Answers include **page citations** and source snippets
+- Modular design — swap models or vector stores easily
+- Interactive PDF picker at ingest time — choose exactly which document to index
 
 ---
 
-## System Architecture
+## Architecture
 
-The engine is divided into two independent modules:
+```
+ingest.py  →  Loads PDF → Splits text → Embeds → Saves FAISS index
+main.py    →  Loads FAISS index → Retrieves chunks → Groq LLM → Answer + Citations
+```
 
-### ingest.py (The Builder)
-- Loads raw PDFs and optional metadata  
-- Splits text using Recursive Character Splitting to preserve semantic meaning  
-- Generates dense vector embeddings  
-- Stores vectors in a local FAISS index  
+### `ingest.py` — Knowledge Base Builder
+- Scans folder for PDFs, shows a selection menu
+- Splits text with `RecursiveCharacterTextSplitter` (600 token chunks, 60 overlap)
+- Embeds with `BAAI/bge-small-en-v1.5` (runs locally on CPU)
+- Saves to `faiss_index/`
 
-### main.py (The Brain)
-- Loads the pre-built FAISS index instantly  
-- Handles retrieval + generation workflow  
-- Uses Groq for ultra-fast LLM responses  
-- Returns answers with source references (page numbers + snippets)  
+### `main.py` — Interactive Chatbot
+- Loads pre-built FAISS index instantly
+- Retrieves top-3 relevant chunks per query
+- Sends context + question to Groq LLM
+- Prints answer with page numbers and text snippets
 
 ---
 
 ## Tech Stack
 
-- Inference Engine: Groq Cloud (llama-3.3-70b-versatile)  
-- Embeddings: BAAI/bge-small-en-v1.5 (local CPU execution)  
-- Vector Store: FAISS (Facebook AI Similarity Search)  
-- Orchestration: LangChain  
-- Environment Management: python-dotenv  
+| Component | Technology |
+|---|---|
+| LLM Inference | [Groq Cloud](https://console.groq.com) (`openai/gpt-oss-20b`) |
+| Embeddings | `BAAI/bge-small-en-v1.5` via HuggingFace (local CPU) |
+| Vector Store | FAISS |
+| Orchestration | LangChain 0.3.x |
+| PDF Loader | PyPDF |
+| Env Management | python-dotenv |
 
 ---
 
 ## Getting Started
 
-### 1. Prerequisites
+### Prerequisites
+- Python 3.9+
+- A free [Groq API Key](https://console.groq.com)
 
-- Python 3.9 or higher  
-- Groq API Key → https://console.groq.com  
-
----
-
-### 2. Installation
-
+### 1. Clone the repo
 ```bash
-git clone https://github.com/yourusername/cseametry-rag-engine.git
-cd cseametry-rag-engine
-
-pip install groq faiss-cpu sentence-transformers langchain-huggingface langchain-groq python-dotenv pypdf
+git clone https://github.com/your-username/your-repo-name.git
+cd your-repo-name
 ```
 
----
+### 2. Create a virtual environment
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\Activate.ps1
+# Mac/Linux
+source .venv/bin/activate
+```
 
-### 3. Configuration
+### 3. Install dependencies
+```bash
+pip install -r requirements.txt
+```
 
-Create a `.env` file in the root directory:
+### 4. Configure environment
+Copy `.env.example` to `.env` and fill in your Groq API key:
+```bash
+cp .env.example .env
+```
 
 ```env
-GROQ_API_KEY=your_actual_groq_api_key
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=openai/gpt-oss-20b
 EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
 ```
 
@@ -84,51 +92,70 @@ EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
 
 ## Usage
 
-### Step 1: Ingest Your Data
-
-Place your PDF files (e.g., `CSeametry.pdf`) in the root directory and run:
-
+### Step 1 — Build the knowledge base
+Place your PDF(s) in the project folder, then run:
 ```bash
 python ingest.py
 ```
+An interactive menu will appear — pick the PDF you want to index:
+```
+Available PDFs:
+  [1] resume.pdf
+  [2] report.pdf
+  [R] Refresh list
+  [Q] Quit
 
-This will generate a `faiss_index/` folder containing your vector database.
+Select a PDF to ingest (1-2, R to refresh, Q to quit): 1
+```
 
----
-
-### Step 2: Chat with Your Documents
-
-Start the interactive assistant:
-
+### Step 2 — Start the assistant
 ```bash
 python main.py
 ```
+```
+---  Assistant Active  ---
 
-You can now query your documents in natural language and receive context-aware answers with citations.
+Question: What are the key projects mentioned?
+
+AI: The document highlights three main projects: ...
+
+Sources used:
+  - [Page 0]: Soham Ghosh — Data Science Graduate...
+  - [Page 1]: IPL 2026 Impact Player Prediction...
+```
+
+Type `exit` or `quit` to stop.
+
+---
+
+## Project Structure
+
+```
+├── main.py                  # Chatbot interface
+├── ingest.py                # PDF ingestion & FAISS index builder
+├── requirements.txt         # Pinned dependencies
+├── .env.example             # Environment variable template
+├── .gitignore               # Excludes .env, .venv, faiss_index/
+└── your_document.pdf        # Your PDF(s) go here
+```
+
+> **Note:** `faiss_index/` and `.env` are excluded from git — never commit your API key.
 
 ---
 
 ## Example Use Cases
 
-- Executive Search: Query annual reports or financial documents instantly  
-- Technical Support: Turn product manuals into an AI helpdesk  
-- Legal Review: Extract clauses and identify risks from contracts  
-- Training & Onboarding: Convert internal documents into an interactive mentor  
+- **Resume Q&A** — Ask about skills, experience, and projects from a CV
+- **Document Search** — Query reports, manuals, or legal contracts in natural language
+- **Study Assistant** — Chat with your textbooks or research papers
+- **Support Bot** — Turn product documentation into an AI helpdesk
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+MIT License — see `LICENSE` for details.
 
 ---
 
-## Contact
-
-Supriyo – CSeametry
-Email: supriyochatterjee@cseametry.co.in
-Website: https://cseametry.co.in
-
----
-
-Built with ❤️ by **CSeametry** — Bridging the gap between data and growth.
+Built with Python, LangChain, Groq, and HuggingFace.
